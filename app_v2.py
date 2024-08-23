@@ -47,11 +47,11 @@ class MainFrame(tk.Frame):
         plant_watering_button = tk.Button(self.task_sidebar, text="Plant Watering")
         plant_watering_button.grid(column=0, row=1, sticky='nsew')
 
-        task2_button = tk.Button(self.task_sidebar, text="task 2")
-        task2_button.grid(column=0, row=2, sticky='nsew')
+        task_2_button = tk.Button(self.task_sidebar, text="Weather")
+        task_2_button.grid(column=0, row=2, sticky='nsew')
 
-        task3_button = tk.Button(self.task_sidebar, text="task 3")
-        task3_button.grid(column=0, row=3, sticky='nsew')
+        task_3_button = tk.Button(self.task_sidebar, text="task 3")
+        task_3_button.grid(column=0, row=3, sticky='nsew')
 
 
     def draw_display_area(self):
@@ -80,15 +80,37 @@ class MainFrame(tk.Frame):
         )
         self.plant_monitor.grid(column=0, row=1, sticky=tk.NSEW, padx=3, pady=3)
 
-        self.plant_monitor.columnconfigure(0, weight=4) # message display area
+        self.plant_monitor.columnconfigure(0, weight=4) # message display area, using pack here so seperate frame
         self.plant_monitor.columnconfigure(1, weight=1) # file display area
         self.plant_monitor.rowconfigure(0, weight=1) 
 
-        # ----------------------------------------------------------------------
+        self.plant_watered_datetime = None
+        # get the datetime of the most recent plant watering from file
+        if os.path.exists(self.data_file_name):
+            print(f"[PLANT MONITOR] file name: {self.data_file_name} exists") 
+            
+            file_content_list = self.file_ops.read_file().split('\n')
+            for line in file_content_list[::-1]:     
+                # skip last line if its blank
+                if line:
+                    print("[PLANT MONITOR] line:", line)
+                    self.plant_watered_datetime = datetime.fromisoformat(line)
+                    break
+            else:
+                print("[PLANT MONITOR] data file is empty")
+        else:
+            print(f"[PLANT MONITOR] file name: {self.data_file_name} doesn't exist")
+
+        print(f"[PLANT MONITOR] plant watered datetime: {self.plant_watered_datetime}")
+
+        # -- message area ------------------------------------------------------
         fr = tk.Frame(
             self.plant_monitor, 
         )
         fr.grid(column=0, row=0, sticky=tk.NSEW)
+
+        water_reminder_label = tk.Label(fr, text=f"Plant last watered at: {self.plant_watered_datetime}", font=("Arial", 18))
+        water_reminder_label.pack(pady=(20, 0))
 
         time_since_plant_watered_label = tk.Label(fr, text="Plant not watered for (HH:MM:SS)", font=("Arial", 18))
         time_since_plant_watered_label.pack(pady=(20, 0))
@@ -96,19 +118,21 @@ class MainFrame(tk.Frame):
         time_since_plant_watered_timer_label = tk.Label(fr, text="--:--:--", font=("Arial",72))
         time_since_plant_watered_timer_label.pack(pady=(20, 0))
 
-        plant_watered_button = tk.Button(fr, text="Plant Watered", command=update_plant_watered_datetime)
+        plant_watered_button = tk.Button(fr, text="Water Plant", command=lambda water_reminder_label: self.update_plant_watered_datetime(water_reminder_label))
         plant_watered_button.pack(pady=(20, 0))
-        # ----------------------------------------------------------------------
 
-        #screen_info_label = tk.Label(self.display_area, text="screen_resolution: NaN")
-        #screen_info_label.grid(side="bottom", fill="x")
+        # -- file display area -------------------------------------------------
+        file_display_listbox = tk.Listbox(self.plant_monitor)
+        file_display_listbox.grid(column=1, row=0, sticky='nsew')
 
-        file_display = tk.Listbox(self.plant_monitor)
-        file_display.grid(column=1, row=0, sticky='nsew')
-
-        self.update_file_display(file_display)
+        # -- events ------------------------------------------------------------
+        self.update_file_display(file_display_listbox)
+        self.update_time_since_plant_watered(fr, time_since_plant_watered_timer_label)
 
     def update_file_display(self, file_display):
+        '''
+        PLANT MONITOR FUNCTION
+        '''
         file_content_list = self.file_ops.read_file().split('\n')
         if file_content_list:
             print("file_content_list not empty")
@@ -121,12 +145,15 @@ class MainFrame(tk.Frame):
                     line = datetime.fromisoformat(line)
                 file_display.insert(tk.END, line)
 
-    def update_time_since_plant_watered(self):
-        if not plant_watered_datetime:
-            root.after(1000, update_time_since_plant_watered)
+    def update_time_since_plant_watered(self, frame, time_since_plant_watered_timer_label):
+        '''
+        PLANT MONITOR FUNCTION
+        '''
+        if not self.plant_watered_datetime:
+            frame.after(1000, self.update_time_since_plant_watered, frame, time_since_plant_watered_timer_label)
             return
 
-        diff = datetime.now() - plant_watered_datetime
+        diff = datetime.now() - self.plant_watered_datetime
         diff_seconds = int(diff.total_seconds())
         h = diff_seconds//3600
         m = (diff_seconds%3600)//60
@@ -135,8 +162,20 @@ class MainFrame(tk.Frame):
         #print(f"time difference: {diff}, {diff_seconds}, {msg}")
         time_since_plant_watered_timer_label.config(text=f"{msg}")
 
-        root.after(1000, update_time_since_plant_watered)
+        frame.after(1000, self.update_time_since_plant_watered, frame, time_since_plant_watered_timer_label)
     
+    def update_plant_watered_datetime(self, water_reminder_label):
+        '''
+        PLANT MONITOR FUNCTION
+        '''
+        # instead of displaying the current time, display the time in hours since last watering, or display that information in addition to date of last watering
+        self.plant_watered_datetime = datetime.now()
+        msg = self.plant_watered_datetime.strftime("%Y-%m-%d %H:%M:%S")
+        water_reminder_label.config(text=f"Plant last watered at: {msg}")
+        self.file_ops.append_line(msg+'\n')
+
+        #self.update_file_display()
+
 def draw_widgets():
     pass
 
@@ -150,22 +189,6 @@ def update_plant_watered_datetime():
 
     update_file_display()
 
-def update_time_since_plant_watered():
-    if not plant_watered_datetime:
-        root.after(1000, update_time_since_plant_watered)
-        return
-
-    diff = datetime.now() - plant_watered_datetime
-    diff_seconds = int(diff.total_seconds())
-    h = diff_seconds//3600
-    m = (diff_seconds%3600)//60
-    s = diff_seconds%60
-    msg = f"{h:02}:{m:02}:{s:02}"
-    #print(f"time difference: {diff}, {diff_seconds}, {msg}")
-    time_since_plant_watered_timer_label.config(text=f"{msg}")
-
-    root.after(1000, update_time_since_plant_watered)
-    
 def update_label():
     # TODO
     # make this event based not timer based
@@ -174,22 +197,6 @@ def update_label():
     msg = f"screen resolution: {W} x {H}"
     screen_info_label.config(text=msg)
     root.after(1000, update_label)
-
-def read_file_line():
-    print(f"file read: {file_ops.read_line()}")
-    
-def update_file_display():
-    file_content_list = file_ops.read_file().split('\n')
-    if file_content_list:
-        print("file_content_list not empty")
-        current_size = file_display.size()
-        print(f"current size of file_display: {current_size}")
-        file_display.delete(0, current_size)
-        print("repopulating")
-        for line in file_content_list:
-            if line:
-                line = datetime.fromisoformat(line)
-            file_display.insert(tk.END, line)
 
 def button_cb(channel):
     print(f"button pressed, cb arg: {channel}")
@@ -211,24 +218,6 @@ my_app_instance = MainFrame(root)
 
 
 if 0:
-    plant_watered_datetime = None
-# get the datetime of the most recent plant watering from file
-    if os.path.exists(data_file_name):
-        print(f"file name: {data_file_name} exists") 
-        
-        file_content_list = file_ops.read_file().split('\n')
-        for line in file_content_list[::-1]:     
-            if line:
-                print("line:", line)
-                plant_watered_datetime = datetime.fromisoformat(line)
-                break
-        else:
-            print("data file is empty")
-    else:
-        print(f"file name: {data_file_name} doesn't exist")
-
-    print(f"plant watered datetime: {plant_watered_datetime}")
-
     draw_widgets()
 
     root.columnconfigure(1, weight=1)
