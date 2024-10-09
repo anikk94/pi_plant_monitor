@@ -118,12 +118,12 @@ class MainFrame(tk.Frame):
         time_since_plant_watered_timer_label = tk.Label(fr, text="--:--:--", font=("Arial",72))
         time_since_plant_watered_timer_label.pack(pady=(20, 0))
 
-        plant_watered_button = tk.Button(fr, text="Water Plant", command=lambda water_reminder_label: self.update_plant_watered_datetime(water_reminder_label))
-        plant_watered_button.pack(pady=(20, 0))
-
-        # -- file display area -------------------------------------------------
+        # -- watering history data file display area ---------------------------
         file_display_listbox = tk.Listbox(self.plant_monitor)
         file_display_listbox.grid(column=1, row=0, sticky='nsew')
+
+        plant_watered_button = tk.Button(fr, text="Water Plant", command=lambda: self.update_plant_watered_datetime(water_reminder_label, file_display_listbox))
+        plant_watered_button.pack(pady=(20, 0))
 
         # -- events ------------------------------------------------------------
         self.update_file_display(file_display_listbox)
@@ -164,17 +164,19 @@ class MainFrame(tk.Frame):
 
         frame.after(1000, self.update_time_since_plant_watered, frame, time_since_plant_watered_timer_label)
     
-    def update_plant_watered_datetime(self, water_reminder_label):
+    def update_plant_watered_datetime(self, water_reminder_label, file_display_listbox):
         '''
         PLANT MONITOR FUNCTION
         '''
-        # instead of displaying the current time, display the time in hours since last watering, or display that information in addition to date of last watering
+        # instead of displaying the current time when the plant is watered,
+        # display the time in hours since last watering, 
+        # or display that information in addition to date of last watering
         self.plant_watered_datetime = datetime.now()
         msg = self.plant_watered_datetime.strftime("%Y-%m-%d %H:%M:%S")
         water_reminder_label.config(text=f"Plant last watered at: {msg}")
         self.file_ops.append_line(msg+'\n')
 
-        #self.update_file_display()
+        self.update_file_display(file_display_listbox)
 
 def draw_widgets():
     pass
@@ -212,7 +214,8 @@ if 0:
 root = tk.Tk()
 root.title("DesktopDisplayApp_v2")
 root.geometry("1000x500")
-root.resizable(width=False, height=False)
+#root.resizable(width=False, height=False)
+root.resizable(width=True, height=True)
 my_app_instance = MainFrame(root)
 #root.configure(bg='blue')
 
